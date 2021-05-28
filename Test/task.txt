@@ -1,0 +1,29 @@
+1.Tom Hanks
+Suppose you will write a summary about Tom Hanks including at least three main aspects, and then find at least five most related entities.
+
+2.Joaquin Phoenix
+Suppose you will write a summary about Joaquin Phoenix including at least three main aspects, and then find at least five most related entities.
+
+3.Joe Biden
+Suppose you will write a summary about Joe Biden including at least three main aspects, and then find at least five most related entities.
+
+4.Mike Tyson
+Suppose you will write a summary about Mike Tyson including at least three main aspects, and then find at least five most related entities.
+
+5.Pizza
+Suppose you will write a summary about Pizza including at least three main aspects, and then find at least five most related entities.
+
+6.Tesla
+Suppose you will write a summary about Tesla including at least three main aspects, and then find at least five most related entities.
+
+7.Kanye West
+Suppose you will write a summary about Kanye West including at least three main aspects, and then find at least five most related entities.
+
+8.Ricky Gervais
+Suppose you will write a summary about Ricky Gervais including at least three main aspects, and then find at least five most related entities.
+
+9.Kim Jong Un
+Suppose you will write a summary about Kim Jong Un including at least three main aspects, and then find at least five most related entities.
+
+10.Elon Musk
+Suppose you will write a summary about Elon Musk including at least three main aspects, and then find at least five most related entities.
