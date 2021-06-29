@@ -7,7 +7,7 @@ import numpy as np
 
 class CasualExplore(object):
     def __init__(self, target, limit, topK, alpha_Relation, alpha_Wc, beta_Wc, omega_Wc, lamda, Fai, fai, d_PageRank,
-                 score_Alpha, score_Beta, score_Omega):
+                 score_Alpha, score_Beta, score_Omega, d_DivRank, pai_DivRank):
         self.cursor = MySQLdb.connect(user='root', passwd='1234', charset='utf8', db='dbpedia2016').cursor()
         self.target = target
         self.limit = limit
@@ -19,6 +19,7 @@ class CasualExplore(object):
         self.d_PageRank = d_PageRank
         self.TopK = topK
         self.score_Alpha, self.score_Beta, self.score_Omega = score_Alpha, score_Beta, score_Omega
+        self.d_DivRank, self.pai_DivRank = d_DivRank, pai_DivRank
         self.entitySet = set()
         self.targetClassList = self.getClassByEntity(target)
         self.searchedDictByEntity = {}
@@ -38,10 +39,14 @@ class CasualExplore(object):
         self.getC2Depth = []
         self.ClassM = np.matrix
         self.EntityM = np.matrix
+        self.DivRankM = np.matrix
         self.ClassPR = []
         self.ClassPRList = []
         self.EntityPR = []
         self.EntityPRList = []
+        self.DivRankPR = []
+        self.DivRankEntityIncidenceList = []
+        self.DivRankPRList = []
         self.TF_IDF = []
         self.EntityPopList = []
 
@@ -86,7 +91,6 @@ class CasualExplore(object):
         current = 1
         while current <= self.limit:
             nextList = []
-            print("现在要搜索的实体总数为", len(self.searchedEntityList))
             for entity in self.searchedEntityList:
                 nextList.extend(self._bfs(entity))
             self.searchedDictByPathLength[current] = nextList
@@ -136,8 +140,6 @@ class CasualExplore(object):
         self.bfs()
         self.getAllEntityNeighbor()
         for iex, class_ in enumerate(self.classSet):
-            print("已经计算到第{}".format(iex + 1), " 共{}条".format(len(self.classSet)))
-            start = time.time()
             RelationList = []
             for class__ in self.classSet:
                 if class_ != class__:
@@ -145,8 +147,7 @@ class CasualExplore(object):
                 else:
                     RelationList.append(0.0)
             self.classRelationList.append(RelationList)
-            end = time.time()
-            print("该类找到所有relation耗用了{}".format((end - start)))
+
 
     def getLengthListOfClass(self, vertexClassFrom, vertexClassTo):
         vertexEntityFromList = self.classEntityDict[vertexClassFrom]
@@ -181,7 +182,7 @@ class CasualExplore(object):
                     next_List.extend(entity_List)
                 search_List = next_List
                 index += 1
-
+                
     def getDiscrepancy(self, c1, c2):
         c1_List = self.classEntityDict[c1]
         c2_List = self.classEntityDict[c2]
@@ -256,6 +257,8 @@ class CasualExplore(object):
         indexC2 = list(self.classSet).index(c2)
         return self.alpha_Wc * self.w1List[indexC2] + self.beta_Wc * self.w2List[indexC2] + self.omega_Wc * self.w3List[
             indexC2]
+            
+# DivRW start
 
     def getIncidenceConnected(self, relation, discrepancy, c2):
         indexC2 = list(self.classSet).index(c2)
@@ -277,7 +280,6 @@ class CasualExplore(object):
 
     def getClassIncidence(self):
         for iex, class_ in enumerate(self.classSet):
-            print("进行到第{}个".format(iex + 1))
             self.w1List.append(self.getW1(class_))
             self.w2List.append(self.getW2(class_))
             self.w3List.append(self.getW3(class_))
@@ -288,7 +290,6 @@ class CasualExplore(object):
             self.wcList.append(self.getWc(class_))
         for iex, class_ in enumerate(self.classSet):
             incidence_list = []
-            print("正在计算概率--------进行到{}个类".format(iex + 1))
             for class__ in self.classSet:
                 incidence_list.append(self.getIncidenceAll(class_, class__))
             self.classIncidentList.append(incidence_list)
@@ -296,11 +297,9 @@ class CasualExplore(object):
     def getClassMatrix(self):
         self.getClassIncidence()
         for i in range(0, len(self.classIncidentList)):
-            print("正在构建第{}列类矩阵".format(i + 1))
             self.classIncidentList[i] = [k / sum(self.classIncidentList[i]) for k in self.classIncidentList[i]]
         self.ClassM = np.array(self.classIncidentList)
         self.ClassM = self.ClassM.T
-        print("Class矩阵已经构建完成")
 
     def matrix_Multiply(self, M, p):
         return np.matmul(M, p)
@@ -320,21 +319,23 @@ class CasualExplore(object):
         for index, class_ in enumerate(self.classSet):
             self.ClassPRList.append((class_, list(self.ClassPR[:, [index]].A)[0][0]))
         self.ClassPRList = sorted(self.ClassPRList, key=lambda classPR: classPR[1], reverse=True)
-        print("进行类排序后得到的结果为")
+        print(self.ClassPRList)
         for index, _ in enumerate(self.ClassPRList):
-            print("{}. {} PR值为{}".format(index + 1, _[0], _[1]))
-        print("下面是根据类排名取出的实体排行")
+            print("{}. {} PR={}".format(index + 1, _[0], _[1]))
+        print("DivRwRank start")
         self.get_TopK_ByClassPR()
         print("--------------------------------------------------------------------------------------")
 
     def get_TopK_ByClassPR(self):
         answerList = []
         for i in range(len(self.classSet)):
-            entityList = self.classEntityDict[self.ClassPRList[i][0]]
             goodList = []
+            entityList = self.classEntityDict[self.ClassPRList[i][0]]
+            print('{}.{}'.format(i, self.ClassPRList[i][0]))
             for entity in entityList:
                 goodList.append((entity, self.getGood(entity)))
             goodList = sorted(goodList, key=lambda goodlist: goodlist[1], reverse=True)
+            print(goodList)
             for item in goodList:
                 if item[0] in answerList or item[0] == self.target:
                     continue
@@ -353,6 +354,8 @@ class CasualExplore(object):
                                                                                          self.getGoodness(answerList[
                                                                                                           0:self.TopK[
                                                                                                               i]])))
+                                                                                                              
+# DivRW end
 
     def getPop(self, entity):
         neighbor_List = self.entityIn(entity) + self.entityOut(entity)
@@ -364,6 +367,8 @@ class CasualExplore(object):
 
     def getGood(self, entity):
         return self.Fai * len(self.getClassByEntity(entity)) / len(self.classSet) + self.fai * self.getPop(entity)
+        
+# PageRank start
 
     def getEntityMatrix(self):
         array_List = []
@@ -415,10 +420,10 @@ class CasualExplore(object):
         for index, node_ in enumerate(self.entitySet):
             self.EntityPRList.append((node_, list(self.EntityPR[:, [index]].A)[0][0]))
             self.EntityPRList = sorted(self.EntityPRList, key=lambda classPR: classPR[1], reverse=True)
-        print("直接实体进行PageRank得到的结果为")
+        print("PageRank start")
         for index, _ in enumerate(self.EntityPRList):
             if _[0] != self.target:
-                print("{}.{} PR值为{}".format(len(answerList) + 1, _[0], _[1]))
+                print("{}.{} PR={}".format(len(answerList) + 1, _[0], _[1]))
                 answerList.append(_[0])
         for i in range(0, len(self.TopK)):
             print(
@@ -430,6 +435,10 @@ class CasualExplore(object):
                                                                                            answerList[0:self.TopK[i]])))
         print("--------------------------------------------------------------------------------------")
 
+#PageRank end
+      
+#TF-IDF Algorithm start
+
     def getEntityTFIDF(self):
         for node in self.entitySet:
             class_List = self.getClassByEntity(node)
@@ -438,11 +447,11 @@ class CasualExplore(object):
                 idf = math.log10(10000 / len(class_List))
                 self.TF_IDF.append((node, class_, tf * idf))
         self.TF_IDF = sorted(self.TF_IDF, key=lambda TF_IDF: TF_IDF[2], reverse=True)
-        print("通过TF,IDF得到的结果为")
+        print("TF-IDF start")
         setTF = []
         for index, _ in enumerate(self.TF_IDF):
             if _[0] not in setTF and _[0] != self.target:
-                print("{}. {} , {}, TF值为{}".format(len(setTF) + 1, _[0], _[1], _[2]))
+                print("{}. {} , {}, TF={}".format(len(setTF) + 1, _[0], _[1], _[2]))
                 setTF.append(_[0])
         for i in range(0, len(self.TopK)):
             print(
@@ -454,18 +463,21 @@ class CasualExplore(object):
                                                                                            setTF[0:self.TopK[i]])))
 
         print("--------------------------------------------------------------------------------------")
+#TF-IDF Algorithm end
+    
+# reRanking start
 
     def getPopularityRank(self):
         for node in self.entitySet:
             self.EntityPopList.append((node, self.getPop(node)))
         self.EntityPopList = sorted(self.EntityPopList, key=lambda entity: entity[1])
         tempList = self.EntityPopList.copy()
-        print("根据启发式原则得到的结果为")
+        print("ReRank start")
         while tempList[-1][0] == self.target:
             tempList.pop()
         First = tempList.pop()
         chosenList = [First[0]]
-        print("1. {} pop值为{}".format(First[0], First[1]))
+        print("1. {} pop={}".format(First[0], First[1]))
         while len(tempList) != 0:
             discrepancyList = []
             for i in range(len(tempList) - 1, -1, -1):
@@ -479,7 +491,7 @@ class CasualExplore(object):
             if tempList[shouldIndex][0] == self.target:
                 continue
             chosenList.append(tempList[shouldIndex][0])
-            print("{}. {} pop值为{}".format(len(chosenList), tempList[shouldIndex][0], tempList[shouldIndex][1]))
+            print("{}. {} pop={}".format(len(chosenList), tempList[shouldIndex][0], tempList[shouldIndex][1]))
             if len(chosenList) >= self.TopK[-1]:
                 break
             del tempList[shouldIndex]
@@ -492,6 +504,8 @@ class CasualExplore(object):
                                                                                        self.getGoodness(
                                                                                            chosenList[0:self.TopK[i]])))
         print("--------------------------------------------------------------------------------------")
+        
+# reRanking end
 
     def getDiscrepancyEntity(self, e1, e2):
         c1 = set(self.getClassByEntity(e1))
@@ -523,19 +537,82 @@ class CasualExplore(object):
         for i in rankList:
             goodness += self.getGood(i)
         return goodness / len(rankList)
+#DivRank start
+    def getDivRankMatrix(self):
+        def getW(e, e_):
+            lengthOneList = self.entityNeighbor[e][1]
+            if e_ in lengthOneList:
+                return 1
+            else:
+                return 0
 
-    def casualExplore(self):
+        def getNt(e_):
+            return len(self.getClassByEntity(e_)) / len(self.classSet)
+
+        def getP0(e, e_):
+            if e == e_:
+                return 1 - self.pai_DivRank
+            else:
+                return self.pai_DivRank * getW(e, e_) / (
+                            len(self.entityNeighbor[e][1]))
+
+        for node in self.entitySet:
+            pt_List = []
+            for node_ in self.entitySet:
+                pt_List.append(getP0(node, node_) * getNt(node_))
+            pt_List = [k / sum(pt_List) for k in pt_List]
+            self.DivRankEntityIncidenceList.append(pt_List)
+
+        self.DivRankM = np.array(self.DivRankEntityIncidenceList)
+        self.DivRankM = self.DivRankM.T
+
+    def getDivRank(self):
+        self.getDivRankMatrix()
+        n = len(self.entitySet)
+        self.DivRankM = np.mat(self.DivRankM)
+        M_inverse = (np.identity(n) - self.d_DivRank * self.DivRankM).I
+        e_T = np.ones(n)
+        second = (1 - self.d_DivRank) * e_T / n
+        p = self.matrix_Multiply(M_inverse, second)
+        self.DivRankPR = p
+        
+
+
+    def displayDivRankPR(self):
+        self.getDivRank()
+        answerList = []
+        for index, node_ in enumerate(self.entitySet):
+            self.DivRankPRList.append((node_, list(self.DivRankPR[:, [index]].A)[0][0]))
+            self.DivRankPRList = sorted(self.DivRankPRList, key=lambda DivRankPR: DivRankPR[1], reverse=True)
+        print("DivRank start")
+        for index, _ in enumerate(self.DivRankPRList):
+            if _[0] != self.target:
+                print("{}.{} PR={}".format(len(answerList) + 1, _[0], _[1]))
+                answerList.append(_[0])
+# DivRank end
+    def casualExplore(self):  	
         self.getRelationOfClass()
-        self.displayClassPR()
+        # start searching
+        
+        self.displayDivRankPR()
+        # DivRank / VRRW
+        
         self.displayEntityPR()
-        self.getEntityTFIDF()
+        # PageRank
+        
+        self.displayClassPR()
+        # DivRW
+        
         self.getPopularityRank()
-
+        # reRanking
+        
+        self.getEntityTFIDF()
+        #TF-IDF Algorithm
 
 if __name__ == '__main__':
     target = "dbr:Tom_Hanks"
-    limit = 2
-    topK = [10, 50, 100]
+    limit = 1
+    topK = [10, 50]
     alpha_Relation = 0.5
     alpha_Wc = 0.3
     beta_Wc = 0.1
@@ -545,6 +622,8 @@ if __name__ == '__main__':
     fai = 0.5
     d_PageRank = 0.85
     score_Alpha, score_Beta, score_Omega = 1 / 3, 1 / 3, 1 / 3
+    d_DivRank = 0.9
+    pai_DivRank = 0.25
     casualExplore = CasualExplore(target, limit, topK, alpha_Relation, alpha_Wc, beta_Wc, omega_Wc, lamda, Fai, fai,
-                                  d_PageRank, score_Alpha, score_Beta, score_Omega)
+                                  d_PageRank, score_Alpha, score_Beta, score_Omega, d_DivRank, pai_DivRank)
     casualExplore.casualExplore()
