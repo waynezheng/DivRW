@@ -165,7 +165,7 @@ class CasualExplore(object):
                         lengthList.append(2)
                     else:
                         lengthList.append(float('inf'))
-        Relation = sum([pow(self.alpha_Relation, i) for i in lengthList]) / len(lengthList)
+        Relation = sum([pow(self.alpha_Relation, i) for i in lengthList]) / (len(vertexEntityToList)+len(vertexEntityFromList))
         return Relation
 
     def getAllEntityNeighbor(self):
